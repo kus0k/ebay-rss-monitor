@@ -47,8 +47,8 @@ class EbayRSSMonitor:
 
     def build_rss_url(self, keywords, min_price, max_price, min_bids):
         """Строит RSS URL для eBay поиска"""
-        # Базовый URL для eBay RSS
-        base_url = "https://feeds.ebay.com/rss/k.rss"
+        # Используем прямой URL поиска eBay с RSS параметром
+        base_url = "https://www.ebay.com/sch/i.html"
 
         params = {}
 
@@ -68,8 +68,8 @@ class EbayRSSMonitor:
         # Сортировка по времени завершения
         params['_sop'] = '10'
 
-        # Количество результатов
-        params['_per_page'] = '100'
+        # RSS формат
+        params['_rss'] = '1'
 
         url = f"{base_url}?{urlencode(params)}"
         return url
