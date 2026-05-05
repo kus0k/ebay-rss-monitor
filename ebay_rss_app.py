@@ -127,52 +127,56 @@ class EbayRSSMonitor:
             else:
                 self.log(f"🔍 Поиск: ВСЕ аукционы...")
 
-            # Строим RSS URL
-            rss_url = self.build_rss_url(keywords, min_price, max_price, min_bids)
-            self.log(f"   📡 Загрузка RSS...")
+            # Строим URL поиска eBay
+            if keywords:
+                url = f"https://www.ebay.com/sch/i.html?_nkw={keywords}&LH_Auction=1&_sop=10"
+            else:
+                url = "https://www.ebay.com/sch/i.html?LH_Auction=1&_sop=10"
+
+            if min_price > 0:
+                url += f"&_udlo={int(min_price)}"
+            if max_price < 999999:
+                url += f"&_udhi={int(max_price)}"
+
+            self.log(f"   📡 Загрузка страницы eBay...")
 
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
                 'Referer': 'https://www.ebay.com/',
                 'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Cache-Control': 'max-age=0',
             }
 
             response = None
 
-            # Пробуем HTTPS
             try:
-                response = requests.get(rss_url, headers=headers, timeout=15, verify=False)
+                response = requests.get(url, headers=headers, timeout=20, verify=False)
                 response.raise_for_status()
+                self.log(f"   ✓ Страница загружена ({len(response.content)} байт)")
             except Exception as e:
-                self.log(f"   ⚠️ HTTPS ошибка: {str(e)[:60]}")
-
-                # Пробуем HTTP
-                try:
-                    http_url = rss_url.replace('https://', 'http://')
-                    response = requests.get(http_url, headers=headers, timeout=15, verify=False)
-                    response.raise_for_status()
-                    self.log(f"   ✓ Подключено через HTTP")
-                except Exception as e2:
-                    self.log(f"   ⚠️ HTTP ошибка: {str(e2)[:60]}")
-                    return
-
-            if not response:
-                self.log(f"   ⚠️ Не удалось загрузить RSS")
+                self.log(f"   ⚠️ Ошибка подключения: {str(e)[:80]}")
                 return
 
             try:
-                soup = BeautifulSoup(response.content, 'xml')
-            except:
-                # Fallback на html.parser если xml не работает
                 soup = BeautifulSoup(response.content, 'html.parser')
+            except Exception as e:
+                self.log(f"   ⚠️ Ошибка парсинга HTML: {str(e)}")
+                return
 
-            # Ищем items в RSS
-            items = soup.find_all('item')
+            # Ищем карточки товаров (div с классом s-item)
+            items = soup.find_all('div', {'class': 's-item'})
 
             if not items:
                 self.log(f"   ⚠️ Результаты не найдены")
+                # Логируем первые 500 символов для отладки
+                self.log(f"   📄 HTML: {response.text[:200]}")
                 return
 
             self.log(f"   ✓ Найдено {len(items)} аукционов")
@@ -181,58 +185,46 @@ class EbayRSSMonitor:
             for item in items:
                 try:
                     # Название
-                    title_elem = item.find('title')
+                    title_elem = item.find('span', {'role': 'heading'})
                     if not title_elem:
                         continue
                     title = title_elem.get_text(strip=True)
 
-                    # Ссылка
-                    link_elem = item.find('link')
-                    item_url = link_elem.get_text(strip=True) if link_elem else ''
+                    # Цена
+                    price_elem = item.find('span', {'class': 's-item__price'})
+                    if not price_elem:
+                        continue
+                    price_text = price_elem.get_text(strip=True)
+                    try:
+                        price = float(re.sub(r'[^\d.]', '', price_text.split()[0]))
+                    except:
+                        continue
 
-                    # Цена (ищем в description или в специальных полях)
-                    price = 0
-
-                    # Пробуем найти в description
-                    desc_elem = item.find('description')
-                    if desc_elem:
-                        desc_text = desc_elem.get_text(strip=True)
-                        # Ищем цену в формате $XX.XX
-                        price_match = re.search(r'\$(\d+\.?\d*)', desc_text)
-                        if price_match:
-                            try:
-                                price = float(price_match.group(1))
-                            except:
-                                pass
-
-                    # Ставки (ищем в description)
+                    # Ставки
+                    bids_elem = item.find('span', {'class': 's-item__bids'})
                     bids = 0
-                    if desc_elem:
-                        desc_text = desc_elem.get_text(strip=True)
-                        # Ищем "X bids" или "X bid"
-                        bids_match = re.search(r'(\d+)\s+bids?', desc_text, re.IGNORECASE)
-                        if bids_match:
-                            try:
-                                bids = int(bids_match.group(1))
-                            except:
-                                pass
+                    if bids_elem:
+                        try:
+                            bids_text = bids_elem.get_text(strip=True)
+                            bids = int(re.sub(r'[^\d]', '', bids_text.split()[0]))
+                        except:
+                            bids = 0
 
-                    # Время завершения (из pubDate)
-                    pub_date_elem = item.find('pubDate')
+                    # Ссылка
+                    link_elem = item.find('a', {'class': 's-item__link'})
+                    item_url = link_elem['href'] if link_elem else ''
+
+                    # Время завершения
                     time_left = "N/A"
-                    if pub_date_elem:
-                        time_left = pub_date_elem.get_text(strip=True)
 
                     # Проверяем фильтры
                     if price >= min_price and price <= max_price and bids >= min_bids:
-                        # Проверяем время завершения
-                        if self.check_ending_time(time_left):
-                            auction_id = f"{title}_{item_url}"
-                            if auction_id not in self.found_auctions:
-                                self.found_auctions.add(auction_id)
-                                self.log(f"✅ НАЙДЕН: {title[:60]}... | ${price} | Ставок: {bids}")
-                                self.add_auction(title, f"${price}", bids, item_url, time_left)
-                                found_count += 1
+                        auction_id = f"{title}_{item_url}"
+                        if auction_id not in self.found_auctions:
+                            self.found_auctions.add(auction_id)
+                            self.log(f"✅ НАЙДЕН: {title[:60]}... | ${price} | Ставок: {bids}")
+                            self.add_auction(title, f"${price}", bids, item_url, time_left)
+                            found_count += 1
 
                 except Exception as e:
                     continue
