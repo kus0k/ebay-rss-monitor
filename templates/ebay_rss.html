@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="eBay RSS Monitor">
+    <title>eBay RSS Monitor Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            color: #ffffff;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 25px 0;
+            background: linear-gradient(135deg, #e53238 0%, #ff6b35 100%);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(229, 50, 56, 0.3);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            color: #fff;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .status {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .status.running {
+            color: #4ade80;
+            font-weight: 600;
+        }
+
+        .section {
+            background: linear-gradient(135deg, #2a2a2a 0%, #252525 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(229, 50, 56, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e53238;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #e53238;
+            background: #222;
+            box-shadow: 0 0 10px rgba(229, 50, 56, 0.2);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #e53238 0%, #ff6b35 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(229, 50, 56, 0.3);
+        }
+
+        .btn-start:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(229, 50, 56, 0.2);
+        }
+
+        .btn-start:disabled {
+            background: #666;
+            color: #999;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-stop:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-stop:disabled {
+            background: #666;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .logs {
+            background: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            height: 220px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #4ade80;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+
+        .auctions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .auction-card {
+            background: linear-gradient(135deg, #1a1a1a 0%, #222 100%);
+            border: 2px solid #e53238;
+            border-radius: 10px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .auction-card:active {
+            background: linear-gradient(135deg, #222 0%, #2a2a2a 100%);
+            border-color: #ff6b35;
+            transform: scale(0.98);
+        }
+
+        .auction-title {
+            font-weight: 700;
+            color: #e53238;
+            margin-bottom: 10px;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .auction-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .info-item {
+            background: #2a2a2a;
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #e53238;
+        }
+
+        .info-label {
+            color: #888;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .info-value {
+            color: #4ade80;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .auction-link {
+            display: block;
+            background: linear-gradient(135deg, #e53238 0%, #ff6b35 100%);
+            color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+            word-break: break-all;
+            transition: all 0.3s;
+        }
+
+        .auction-link:active {
+            transform: scale(0.98);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #666;
+            padding: 30px 20px;
+            font-size: 14px;
+        }
+
+        .warning {
+            background: linear-gradient(135deg, #e53238 0%, #ff6b35 100%);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .auction-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 eBay RSS Monitor Pro</h1>
+            <div class="status" id="status">● Остановлен</div>
+        </div>
+
+        <!-- Информация -->
+        <div class="section">
+            <div class="section-title">ℹ️ Информация</div>
+            <div class="warning">
+                ✅ Официальный мониторинг через eBay RSS - без прокси!
+            </div>
+        </div>
+
+        <!-- Параметры поиска -->
+        <div class="section">
+            <div class="section-title">🔍 Параметры поиска</div>
+
+            <div class="form-group">
+                <label>Ключевые слова (через запятую)</label>
+                <input type="text" id="keywords" placeholder="adidas, nike, iphone">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Минимальная цена ($)</label>
+                    <input type="number" id="min_price" value="1">
+                </div>
+                <div class="form-group">
+                    <label>Максимальная цена ($)</label>
+                    <input type="number" id="max_price" value="500">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Минимум ставок</label>
+                    <input type="number" id="min_bids" value="1">
+                </div>
+                <div class="form-group">
+                    <label>Интервал проверки (сек)</label>
+                    <input type="number" id="interval" value="60">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Время завершения (мин)</label>
+                <input type="number" id="ending_time" value="5" min="1">
+            </div>
+
+            <div class="button-group">
+                <button class="btn-start" id="startBtn" onclick="startMonitoring()">▶ СТАРТ</button>
+                <button class="btn-stop" id="stopBtn" onclick="stopMonitoring()" disabled>⏹ СТОП</button>
+            </div>
+        </div>
+
+        <!-- Логи -->
+        <div class="section">
+            <div class="section-title">📋 Логи</div>
+            <div class="logs" id="logs">
+                <div class="log-entry">Ожидание запуска...</div>
+            </div>
+        </div>
+
+        <!-- Найденные аукционы -->
+        <div class="section">
+            <div class="section-title">🎯 Найденные аукционы</div>
+            <div class="auctions" id="auctions">
+                <div class="empty-state">Аукционы появятся здесь</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let statusInterval;
+
+        window.startMonitoring = async function() {
+            console.log('Start button clicked');
+            const keywords = document.getElementById('keywords').value;
+            const min_price = document.getElementById('min_price').value;
+            const max_price = document.getElementById('max_price').value;
+            const min_bids = document.getElementById('min_bids').value;
+            const interval = document.getElementById('interval').value;
+            const ending_time = document.getElementById('ending_time').value;
+
+            console.log('Parameters:', { keywords, min_price, max_price, min_bids, interval, ending_time });
+
+            try {
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keywords, min_price, max_price, min_bids, interval, ending_time
+                    })
+                });
+
+                const text = await response.text();
+                if (!text || text.length === 0) {
+                    alert('❌ Пустой ответ от сервера');
+                    return;
+                }
+
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    alert('❌ Ошибка парсинга JSON: ' + e.message);
+                    return;
+                }
+
+                if (data.success) {
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    statusInterval = setInterval(updateStatus, 1000);
+                } else {
+                    alert('❌ Ошибка при запуске мониторинга: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Ошибка: ' + error.message);
+            }
+        };
+
+        window.stopMonitoring = async function() {
+            console.log('Stop button clicked');
+            await fetch('/api/stop', { method: 'POST' });
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            clearInterval(statusInterval);
+            updateStatus();
+        };
+
+        async function updateStatus() {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+
+            // Обновляем статус
+            const statusEl = document.getElementById('status');
+            if (data.running) {
+                statusEl.textContent = '● Запущен ✓';
+                statusEl.classList.add('running');
+            } else {
+                statusEl.textContent = '● Остановлен';
+                statusEl.classList.remove('running');
+            }
+
+            // Обновляем логи
+            const logsEl = document.getElementById('logs');
+            logsEl.innerHTML = data.logs.map(log =>
+                `<div class="log-entry">${log}</div>`
+            ).join('');
+            logsEl.scrollTop = logsEl.scrollHeight;
+
+            // Обновляем аукционы
+            const auctionsEl = document.getElementById('auctions');
+            if (data.auctions.length === 0) {
+                auctionsEl.innerHTML = '<div class="empty-state">Аукционы появятся здесь</div>';
+            } else {
+                auctionsEl.innerHTML = data.auctions.map(auction => `
+                    <div class="auction-card">
+                        <div class="auction-title">${auction.title}</div>
+                        <div class="auction-info">
+                            <div class="info-item">
+                                <div class="info-label">💰 Цена</div>
+                                <div class="info-value">${auction.price}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">📊 Ставок</div>
+                                <div class="info-value">${auction.bids}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">🕐 Найден</div>
+                                <div class="info-value">${auction.timestamp}</div>
+                            </div>
+                        </div>
+                        <a href="${auction.url}" target="_blank" class="auction-link">Открыть аукцион</a>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Обновляем статус каждую секунду
+        updateStatus();
+    </script>
+</body>
+</html>
