@@ -132,14 +132,34 @@ class EbayRSSMonitor:
             self.log(f"   📡 Загрузка RSS...")
 
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://www.ebay.com/',
+                'Connection': 'keep-alive',
             }
 
+            response = None
+
+            # Пробуем HTTPS
             try:
-                response = requests.get(rss_url, headers=headers, timeout=15)
+                response = requests.get(rss_url, headers=headers, timeout=15, verify=False)
                 response.raise_for_status()
             except Exception as e:
-                self.log(f"   ⚠️ Ошибка подключения: {str(e)[:80]}")
+                self.log(f"   ⚠️ HTTPS ошибка: {str(e)[:60]}")
+
+                # Пробуем HTTP
+                try:
+                    http_url = rss_url.replace('https://', 'http://')
+                    response = requests.get(http_url, headers=headers, timeout=15, verify=False)
+                    response.raise_for_status()
+                    self.log(f"   ✓ Подключено через HTTP")
+                except Exception as e2:
+                    self.log(f"   ⚠️ HTTP ошибка: {str(e2)[:60]}")
+                    return
+
+            if not response:
+                self.log(f"   ⚠️ Не удалось загрузить RSS")
                 return
 
             try:
