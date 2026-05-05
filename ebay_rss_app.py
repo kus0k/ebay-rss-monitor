@@ -151,17 +151,40 @@ class EbayRSSMonitor:
                 'Sec-Fetch-Dest': 'document',
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
                 'Cache-Control': 'max-age=0',
+                'DNT': '1',
             }
 
             response = None
+            max_retries = 3
 
-            try:
-                response = requests.get(url, headers=headers, timeout=20, verify=False)
-                response.raise_for_status()
-                self.log(f"   ✓ Страница загружена ({len(response.content)} байт)")
-            except Exception as e:
-                self.log(f"   ⚠️ Ошибка подключения: {str(e)[:80]}")
+            for attempt in range(max_retries):
+                try:
+                    self.log(f"   🔄 Попытка {attempt + 1}/{max_retries}...")
+
+                    session = requests.Session()
+                    session.verify = False
+
+                    response = session.get(url, headers=headers, timeout=20)
+
+                    if response.status_code == 403:
+                        self.log(f"   ⚠️ 403 Forbidden - eBay блокирует запрос")
+                        time.sleep(2)
+                        continue
+
+                    response.raise_for_status()
+                    self.log(f"   ✓ Страница загружена ({len(response.content)} байт)")
+                    break
+
+                except Exception as e:
+                    self.log(f"   ⚠️ Попытка {attempt + 1} ошибка: {str(e)[:60]}")
+                    time.sleep(2)
+                    continue
+
+            if not response or response.status_code != 200:
+                self.log(f"   ❌ Не удалось загрузить страницу после {max_retries} попыток")
+                self.log(f"   💡 Совет: используйте прокси или попробуйте позже")
                 return
 
             try:
@@ -175,8 +198,6 @@ class EbayRSSMonitor:
 
             if not items:
                 self.log(f"   ⚠️ Результаты не найдены")
-                # Логируем первые 500 символов для отладки
-                self.log(f"   📄 HTML: {response.text[:200]}")
                 return
 
             self.log(f"   ✓ Найдено {len(items)} аукционов")
